@@ -1,0 +1,97 @@
+#/home/btls/english-learning-agent/.gitignore
+# ==========================
+# Python (后端)
+# ==========================
+# 字节码文件 (Python 自动生成的)
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C 扩展
+*.so
+
+# 包发布相关
+dist/
+build/
+*.egg-info/
+
+# PyInstaller (如果以后打包)
+*.manifest
+*.spec
+
+# ==========================
+# 虚拟环境 (Virtual Env)
+# ==========================
+# 这一条非常重要，不要上传几百兆的依赖包
+venv/
+.venv/
+env/
+ENV/
+
+# ==========================
+# 环境变量与安全 (CRITICAL)
+# ==========================
+# 绝对不能上传包含密码的文件！！！
+.env
+.env.*
+*.env
+
+# 但是可以保留一个示例文件 (如果没有，建议以后创建一个 .env.example)
+!.env.example
+
+# ==========================
+# IDE / 编辑器
+# ==========================
+# VS Code 设置 (根据个人喜好，通常不上传本地配置)
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# JetBrains / PyCharm
+.idea/
+
+# Mac / Windows 系统文件
+.DS_Store
+Thumbs.db
+
+# ==========================
+# 数据库
+# ==========================
+# 虽然你用的是 Postgres，但防止以后生成本地临时库
+*.sqlite3
+*.db
+
+# ==========================
+# 日志文件
+# ==========================
+*.log
+logs/
+
+# ==========================
+# Flutter (前端 - 预留)
+# ==========================
+.dart_tool/
+.packages
+.pub/
+.flutter-plugins
+.flutter-plugins-dependencies
+
+# Flutter build output
+/build/
+
+# Android specific
+**/android/app/libs/
+**/android/app/src/main/assets/
+**/android/gradle-wrapper/
+**/android/.gradle
+**/android/captures/
+**/android/gradle.properties
+**/android/local.properties
+
+# iOS specific
+**/ios/Flutter/App.framework
+**/ios/Flutter/Flutter.framework
+**/ios/ServiceDefinitions.json
+**/ios/Runner/GeneratedPluginRegistrant.*
