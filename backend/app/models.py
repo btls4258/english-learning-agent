@@ -1,4 +1,5 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Text, UniqueConstraint
+#/home/btls/english-learning-agent/backend/app/models.py
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Text, UniqueConstraint, Float
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.database import Base
@@ -66,41 +67,51 @@ class Word(Base):
     def __repr__(self):
         return f"<Word(spelling='{self.spelling}', book_id={self.book_id})>"
 
+# /home/btls/english-learning-agent/backend/app/models.py
+# ... (前面的 User, Book, Word 保持不变，不要动)
+
 class UserWordProgress(Base):
     """
-    用户单词学习进度表
-    记录：哪个用户(user_id)，学了哪个词(word_id)，学得怎样(proficiency)
+    用户单词学习进度表 (升级版：支持 SM-2 算法)
     """
     __tablename__ = "user_word_progress"
 
     id = Column(Integer, primary_key=True, index=True)
     
-    # 1. 核心关联：谁学的？学的哪个词？
+    # 关联
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     word_id = Column(Integer, ForeignKey("words.id"), nullable=False)
     
-    # 2. 记忆算法核心字段 (为艾宾浩斯/SM-2算法做准备)
-    is_mastered = Column(Boolean, default=False)  # 是否已完全掌握（斩词）
-    proficiency = Column(Integer, default=0)      # 熟练度 (0-5)，类似 Anki 的打分
-    
-    # 3. 时间字段 (调度复习的关键)
-    next_review_at = Column(DateTime(timezone=True), nullable=True) # 下次该复习的时间
-    last_reviewed_at = Column(DateTime(timezone=True), nullable=True) # 上次复习时间
+    # --- 学习状态 ---
+    is_mastered = Column(Boolean, default=False)  # 是否已斩词
+
+    # --- SM-2 算法核心参数 (NEW) ---
+    # 1. 易记因子 (Easiness Factor)，标准初始值为 2.5
+    easiness_factor = Column(Float, default=2.5) 
+    # 2. 下次复习间隔 (Interval)，单位：天
+    interval = Column(Integer, default=0)
+    # 3. 连续正确次数 (Repetitions)
+    repetitions = Column(Integer, default=0)
+
+    # --- 时间字段 ---
+    next_review_at = Column(DateTime(timezone=True), nullable=True) # 下次复习的具体日期
+    last_reviewed_at = Column(DateTime(timezone=True), nullable=True)
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now())
 
-    # 4. 建立反向关系 (可选，方便查询)
-    # 这样 user.progresses 就能拿到该用户所有的学习记录
-    # word.progresses 就能拿到这个词被哪些用户学过
+    # 关系和约束
     user = relationship("User", backref="progresses") 
     word = relationship("Word", backref="progresses")
-
-    # 5. 关键约束：一个用户对同一个单词，只能有一条记录！
-    # 这是一个数据库层面的“保险锁”
+    
     __table_args__ = (
         UniqueConstraint('user_id', 'word_id', name='uix_user_word'),
     )
+    
+    # 删掉了之前的 proficiency，因为 repetitions 可以替代它，或者你可以保留它作为辅助显示
+    # 为了防止报错，如果你想保留 proficiency 也可以，但 SM-2 主要靠上面三个参数。
+    # 这里我们选择保留 proficiency 作为一个简单的 0-100 的直观展示分数，不参与核心算法
+    proficiency = Column(Integer, default=0) 
 
     def __repr__(self):
-        return f"<Progress(user={self.user_id}, word={self.word_id}, prof={self.proficiency})>"
+        return f"<Progress(u={self.user_id}, w={self.word_id}, interval={self.interval}d)>"

@@ -1,3 +1,4 @@
+#/home/btls/english-learning-agent/backend/app/schemas.py
 from pydantic import BaseModel, EmailStr
 from datetime import datetime
 
@@ -39,5 +40,42 @@ class ProgressOut(ProgressBase):
     next_review_at: datetime | None  # 允许为空
     last_reviewed_at: datetime | None
 
+    easiness_factor: float
+    interval: int
+    repetitions: int
+    
     class Config:
         from_attributes = True
+
+# --- 新增：用于复习列表的组合模型 ---
+
+# 1. 先定义一个简单的单词模型，只包含我们要显示的字段
+class WordSimple(BaseModel):
+    id: int
+    spelling: str
+    meaning: str
+    
+    class Config:
+        from_attributes = True
+
+# 2. 定义带有单词详情的进度模型
+# 继承自 ProgressOut，所以它拥有 id, next_review_at 等字段
+# 但额外增加了一个 'word' 字段
+class ProgressWithWord(ProgressOut):
+    word: WordSimple
+
+
+# --- 新增：复习打分模型 ---
+class ReviewCreate(BaseModel):
+    word_id: int
+    quality: int  # 记忆质量打分：0=不认识, 3=模糊, 5=完全认识 (这只是个约定)
+
+# --- 新增：Token 响应模型 ---
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+# --- 新增：Token 数据模型 ---
+# 用于将来解析 Token 时存储其中的信息（比如用户名）
+class TokenData(BaseModel):
+    email: str | None = None

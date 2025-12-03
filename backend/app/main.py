@@ -1,12 +1,39 @@
-from fastapi import FastAPI, Depends, HTTPException
-from sqlalchemy import text, select
-from sqlalchemy.ext.asyncio import AsyncSession
-from datetime import datetime  # 必须导入 datetime
+#/home/btls/english-learning-agent/backend/app/main.py
+# /home/btls/english-learning-agent/backend/app/main.py
 
-# 导入我们自己写的文件
+import asyncio
+from logging.config import fileConfig
+import os
+import sys
+from datetime import datetime, timedelta
+from typing import List
+import math
+# 1. FastAPI 相关
+# 【修复点 1】：这里加上了 status
+from fastapi import FastAPI, Depends, HTTPException, status 
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+
+# 2. 数据库相关
+from sqlalchemy import text, select
+from sqlalchemy.orm import selectinload
+from sqlalchemy.ext.asyncio import AsyncSession
+
+# 3. JWT 相关
+# 【修复点 2】：这一行之前漏掉了，必须加上，否则无法解密 Token
+from jose import JWTError, jwt 
+
+# 4. 本地模块
 from app.database import get_db
 from app import models, schemas
 from app.models import User, Book, Word, UserWordProgress
+# 引入密钥配置，用于解密
+from app.security import (
+    verify_password, 
+    create_access_token, 
+    get_password_hash,
+    SECRET_KEY, 
+    ALGORITHM
+)
 
 # 初始化应用
 app = FastAPI(
@@ -15,14 +42,50 @@ app = FastAPI(
     version="0.0.1"
 )
 
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 # --- 临时辅助函数：模拟获取当前登录用户 ---
 # 在真正的项目中，这里会从 Token 解析出 user_id
-async def get_current_user_id():
-    return 1  # 假设当前一直是 ID=1 的用户在操作
+async def get_current_user(
+    token: str = Depends(oauth2_scheme), 
+    db: AsyncSession = Depends(get_db)
+) -> models.User:
+    """
+    智能门禁函数：
+    1. 自动从请求头 Authorization: Bearer <token> 中提取 token
+    2. 解析 token 获取邮箱
+    3. 查数据库返回 User 对象
+    """
+    # 定义一个“认证失败”的异常，后面如果出错就抛出这个
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
 
-# --- 辅助函数：伪造的密码加密 ---
-def fake_hash_password(password: str):
-    return password + "notreallyhashed"
+    try:
+        # A. 解密 Token
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        # B. 取出 Token 里的身份标识 (我们在登录时把 email 放进了 sub 字段)
+        email: str = payload.get("sub")
+        if email is None:
+            raise credentials_exception
+    except JWTError:
+        # 如果 Token 被篡改、过期或格式不对，会报错
+        raise credentials_exception
+
+    # C. 去数据库核实这个人是否还存在
+    stmt = select(models.User).where(models.User.email == email)
+    result = await db.execute(stmt)
+    user = result.scalar_one_or_none()
+
+    if user is None:
+        raise credentials_exception
+
+    # D. 返回完整的用户对象 (包含 id, username, email 等)
+    return user
+
+
 
 # =======================
 # 基础路由与健康检查
@@ -59,10 +122,7 @@ async def test_db_connection(db: AsyncSession = Depends(get_db)):
 @app.post("/users/", response_model=schemas.UserOut)
 async def create_user(user: schemas.UserCreate, db: AsyncSession = Depends(get_db)):
     """
-    注册新用户：
-    1. 检查邮箱是否已存在
-    2. 加密密码
-    3. 存入数据库
+    注册新用户
     """
     # 1. 查询邮箱是否存在
     result = await db.execute(select(models.User).where(models.User.email == user.email))
@@ -72,10 +132,11 @@ async def create_user(user: schemas.UserCreate, db: AsyncSession = Depends(get_d
         raise HTTPException(status_code=400, detail="Email already registered")
 
     # 2. 准备数据库模型对象
+    # 【修改点】：使用 get_password_hash 替代 fake_hash_password
     new_user = models.User(
         email=user.email,
         username=user.username,
-        hashed_password=fake_hash_password(user.password)
+        hashed_password=get_password_hash(user.password) # <--- 这里改了
     )
     
     # 3. 添加到会话并提交
@@ -84,6 +145,42 @@ async def create_user(user: schemas.UserCreate, db: AsyncSession = Depends(get_d
     await db.refresh(new_user)
 
     return new_user
+@app.post("/token", response_model=schemas.Token)
+async def login_for_access_token(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    用户登录接口 (获取 Token)
+    注意：虽然 form_data 里的字段叫 username，但我们逻辑上是把它当 email 用
+    """
+    # 1. 尝试在数据库中查找用户 (按邮箱查找)
+    # 这里的 form_data.username 是前端传来的账号（在这个系统里是邮箱）
+    stmt = select(models.User).where(models.User.email == form_data.username)
+    result = await db.execute(stmt)
+    user = result.scalar_one_or_none()
+
+    # 2. 验证用户是否存在，以及密码是否正确
+    # verify_password(明文, 密文) -> bool
+    if not user or not verify_password(form_data.password, user.hashed_password):
+        # 401 Unauthorized 是标准的认证失败状态码
+        raise HTTPException(
+            status_code=401,
+            detail="Incorrect email or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # 3. 登录成功，生成 Token
+    # 我们把 email 放入 Token 中，作为身份标识 (sub)
+    access_token_expires = timedelta(minutes=30) # 30分钟有效期，也可以去读 .env 配置
+    access_token = create_access_token(
+        data={"sub": user.email}, 
+        expires_delta=access_token_expires
+    )
+
+    # 4. 返回 Token 给前端
+    return {"access_token": access_token, "token_type": "bearer"}
+
 
 # =======================
 # 学习业务接口 (Study)
@@ -93,38 +190,133 @@ async def create_user(user: schemas.UserCreate, db: AsyncSession = Depends(get_d
 async def create_learning_record(
     progress_data: schemas.ProgressCreate,
     db: AsyncSession = Depends(get_db),
-    user_id: int = Depends(get_current_user_id) # 注入当前用户ID
+    # 【修改这里】：依赖变成了 get_current_user，类型是 models.User
+    current_user: models.User = Depends(get_current_user) 
 ):
-    """
-    用户开始学习一个新单词：
-    1. 检查是否已经学过这个词
-    2. 如果没学过 -> 创建新记录
-    3. 如果学过 -> 返回现有记录
-    """
-    # 1. 查重：看看这个用户对这个词是不是已经有进度了
+    # 下面的 user_id 都要改成 current_user.id
+    
+    # 1. 查重
     stmt = select(UserWordProgress).where(
-        UserWordProgress.user_id == user_id,
+        UserWordProgress.user_id == current_user.id, # <--- 修改
         UserWordProgress.word_id == progress_data.word_id
     )
     result = await db.execute(stmt)
     existing_record = result.scalar_one_or_none()
 
     if existing_record:
-        # 如果已经有了，直接返回旧的记录
         return existing_record
 
     # 2. 创建新记录
-    # 注意：next_review_at 设置为当前时间，表示"现在就需要复习/学习"
     new_progress = UserWordProgress(
-        user_id=user_id,
+        user_id=current_user.id, # <--- 修改
         word_id=progress_data.word_id,
         proficiency=0,
         next_review_at=datetime.now() 
     )
 
-    # 3. 写入数据库
     db.add(new_progress)
     await db.commit()
     await db.refresh(new_progress)
 
     return new_progress
+
+@app.get("/study/needs-review", response_model=List[schemas.ProgressWithWord])
+async def get_words_to_review(
+    db: AsyncSession = Depends(get_db),
+    current_user: models.User = Depends(get_current_user) # <--- 修改
+):
+    now = datetime.now()
+    stmt = (
+        select(UserWordProgress)
+        .options(selectinload(UserWordProgress.word))
+        .where(
+            UserWordProgress.user_id == current_user.id, # <--- 修改
+            UserWordProgress.next_review_at <= now
+        )
+        .order_by(UserWordProgress.next_review_at)
+    )
+    result = await db.execute(stmt)
+    return result.scalars().all()
+
+@app.post("/study/review", response_model=schemas.ProgressOut) # 注意这里改了 response_model
+async def review_word(
+    review_data: schemas.ReviewCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """
+    SuperMemo-2 (SM-2) 算法实现接口
+    输入: word_id, quality (0-5)
+    输出: 更新后的进度记录
+    """
+    # 1. 查找进度记录
+    stmt = select(UserWordProgress).where(
+        UserWordProgress.user_id == current_user.id,
+        UserWordProgress.word_id == review_data.word_id
+    )
+    result = await db.execute(stmt)
+    progress = result.scalar_one_or_none()
+
+    # 如果还没学过这个词，就先创建一条进度（容错处理）
+    if not progress:
+        progress = UserWordProgress(
+            user_id=current_user.id,
+            word_id=review_data.word_id,
+            easiness_factor=2.5,
+            interval=0,
+            repetitions=0
+        )
+        db.add(progress)
+
+    # 2. 提取当前状态
+    q = review_data.quality
+    ef = progress.easiness_factor
+    reps = progress.repetitions
+    interval = progress.interval
+
+    # 3. 运行 SM-2 算法
+    if q < 3:
+        # --- 失败分支 ---
+        # 如果忘了 (0-2分)，进度重置
+        reps = 0
+        interval = 1 
+        # EF 保持不变 (有些变体建议减少 EF，但原版 SM-2 只有成功才调整 EF，这里我们简化处理)
+    else:
+        # --- 成功分支 ---
+        # A. 计算新的 EF
+        # 公式：EF' = EF + (0.1 - (5-q) * (0.08 + (5-q)*0.02))
+        # 逻辑：打分越低(接近3)，减分越多
+        new_ef = ef + (0.1 - (5 - q) * (0.08 + (5 - q) * 0.02))
+        if new_ef < 1.3:
+            new_ef = 1.3 # 设定下限，防止死循环
+        ef = new_ef
+
+        # B. 计算新的间隔 (Interval)
+        reps += 1
+        if reps == 1:
+            interval = 1
+        elif reps == 2:
+            interval = 6
+        else:
+            # 第三次及以后：旧间隔 * EF
+            interval = int(interval * ef)
+
+    # 4. 更新数据库对象
+    progress.easiness_factor = ef
+    progress.repetitions = reps
+    progress.interval = interval
+    
+    # 5. 计算下次复习的具体日期
+    now = datetime.now()
+    progress.last_reviewed_at = now
+    progress.next_review_at = now + timedelta(days=interval)
+    
+    # 更新熟练度 (仅作 UI 展示，非算法核心)
+    # 简单逻辑：连续对的次数越多，熟练度越高，封顶 100
+    progress.proficiency = min(reps * 20, 100)
+
+    # 6. 提交事务
+    await db.commit()
+    await db.refresh(progress)
+    
+    return progress
