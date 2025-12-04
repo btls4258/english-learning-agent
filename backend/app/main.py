@@ -1,6 +1,6 @@
 #/home/btls/english-learning-agent/backend/app/main.py
 # /home/btls/english-learning-agent/backend/app/main.py
-
+from app.api import chat
 import asyncio
 from logging.config import fileConfig
 import os
@@ -34,6 +34,8 @@ from app.security import (
     SECRET_KEY, 
     ALGORITHM
 )
+# 引入依赖函数
+from app.dependencies import get_current_user
 
 # 初始化应用
 app = FastAPI(
@@ -42,48 +44,7 @@ app = FastAPI(
     version="0.0.1"
 )
 
-
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-# --- 临时辅助函数：模拟获取当前登录用户 ---
-# 在真正的项目中，这里会从 Token 解析出 user_id
-async def get_current_user(
-    token: str = Depends(oauth2_scheme), 
-    db: AsyncSession = Depends(get_db)
-) -> models.User:
-    """
-    智能门禁函数：
-    1. 自动从请求头 Authorization: Bearer <token> 中提取 token
-    2. 解析 token 获取邮箱
-    3. 查数据库返回 User 对象
-    """
-    # 定义一个“认证失败”的异常，后面如果出错就抛出这个
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-
-    try:
-        # A. 解密 Token
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        # B. 取出 Token 里的身份标识 (我们在登录时把 email 放进了 sub 字段)
-        email: str = payload.get("sub")
-        if email is None:
-            raise credentials_exception
-    except JWTError:
-        # 如果 Token 被篡改、过期或格式不对，会报错
-        raise credentials_exception
-
-    # C. 去数据库核实这个人是否还存在
-    stmt = select(models.User).where(models.User.email == email)
-    result = await db.execute(stmt)
-    user = result.scalar_one_or_none()
-
-    if user is None:
-        raise credentials_exception
-
-    # D. 返回完整的用户对象 (包含 id, username, email 等)
-    return user
+app.include_router(chat.router)
 
 
 
@@ -154,32 +115,45 @@ async def login_for_access_token(
     用户登录接口 (获取 Token)
     注意：虽然 form_data 里的字段叫 username，但我们逻辑上是把它当 email 用
     """
-    # 1. 尝试在数据库中查找用户 (按邮箱查找)
-    # 这里的 form_data.username 是前端传来的账号（在这个系统里是邮箱）
-    stmt = select(models.User).where(models.User.email == form_data.username)
-    result = await db.execute(stmt)
-    user = result.scalar_one_or_none()
+    try:
+        # 1. 尝试在数据库中查找用户 (按邮箱查找)
+        # 这里的 form_data.username 是前端传来的账号（在这个系统里是邮箱）
+        stmt = select(models.User).where(models.User.email == form_data.username)
+        result = await db.execute(stmt)
+        user = result.scalar_one_or_none()
 
-    # 2. 验证用户是否存在，以及密码是否正确
-    # verify_password(明文, 密文) -> bool
-    if not user or not verify_password(form_data.password, user.hashed_password):
-        # 401 Unauthorized 是标准的认证失败状态码
-        raise HTTPException(
-            status_code=401,
-            detail="Incorrect email or password",
-            headers={"WWW-Authenticate": "Bearer"},
+        # 2. 验证用户是否存在，以及密码是否正确
+        # verify_password(明文, 密文) -> bool
+        if not user or not verify_password(form_data.password, user.hashed_password):
+            # 401 Unauthorized 是标准的认证失败状态码
+            raise HTTPException(
+                status_code=401,
+                detail="Incorrect email or password",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+        # 3. 登录成功，生成 Token
+        # 我们把 email 放入 Token 中，作为身份标识 (sub)
+        access_token_expires = timedelta(minutes=30) # 30分钟有效期，也可以去读 .env 配置
+        access_token = create_access_token(
+            data={"sub": user.email}, 
+            expires_delta=access_token_expires
         )
 
-    # 3. 登录成功，生成 Token
-    # 我们把 email 放入 Token 中，作为身份标识 (sub)
-    access_token_expires = timedelta(minutes=30) # 30分钟有效期，也可以去读 .env 配置
-    access_token = create_access_token(
-        data={"sub": user.email}, 
-        expires_delta=access_token_expires
-    )
-
-    # 4. 返回 Token 给前端
-    return {"access_token": access_token, "token_type": "bearer"}
+        # 4. 返回 Token 给前端
+        return {"access_token": access_token, "token_type": "bearer"}
+    
+    except HTTPException:
+        # 重新抛出HTTP异常（如401）
+        raise
+    except Exception as e:
+        # 捕获其他异常，返回详细错误信息用于调试
+        import traceback
+        error_detail = f"登录处理失败: {str(e)}\n{traceback.format_exc()}"
+        raise HTTPException(
+            status_code=500,
+            detail=error_detail
+        )
 
 
 # =======================

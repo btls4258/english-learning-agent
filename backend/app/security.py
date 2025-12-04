@@ -17,6 +17,10 @@ SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = os.getenv("ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 30))
 
+# 验证必需配置
+if not SECRET_KEY:
+    raise ValueError("SECRET_KEY环境变量未设置，请在.env文件中配置")
+
 # --- 核心函数 1：密码处理 ---
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
