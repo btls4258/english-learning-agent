@@ -94,4 +94,4 @@ logs/
 **/ios/Flutter/App.framework
 **/ios/Flutter/Flutter.framework
 **/ios/ServiceDefinitions.json
-**/ios/Runner/GeneratedPluginRegistrant.*
+**/ios/Runner/GeneratedPluginRegistrant.**:Zone.Identifier
