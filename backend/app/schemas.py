@@ -47,6 +47,35 @@ class ProgressOut(ProgressBase):
     class Config:
         from_attributes = True
 
+# --- 新增：单词书相关模型 ---
+
+# 1. 单词书基础模型
+class BookBase(BaseModel):
+    title: str
+    code: str
+    description: str
+
+# 2. 返回给前端的单词书模型
+class BookOut(BookBase):
+    id: int
+
+    class Config:
+        from_attributes = True
+
+# 3. 单词基础模型
+class WordBase(BaseModel):
+    spelling: str
+    phonetic: str
+    meaning: str
+
+# 4. 返回给前端的单词模型
+class WordOut(WordBase):
+    id: int
+    book_id: int
+
+    class Config:
+        from_attributes = True
+
 # --- 新增：用于复习列表的组合模型 ---
 
 # 1. 先定义一个简单的单词模型，只包含我们要显示的字段

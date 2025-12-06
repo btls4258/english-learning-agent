@@ -12,6 +12,7 @@ import math
 # 【修复点 1】：这里加上了 status
 from fastapi import FastAPI, Depends, HTTPException, status 
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.middleware.cors import CORSMiddleware
 
 # 2. 数据库相关
 from sqlalchemy import text, select
@@ -42,6 +43,15 @@ app = FastAPI(
     title="English Learning Agent API",
     description="英语大模型助教后端接口",
     version="0.0.1"
+)
+
+# 配置CORS中间件，允许前端跨域访问
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # 开发环境允许所有来源，生产环境应指定具体域名
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 app.include_router(chat.router)
@@ -208,6 +218,29 @@ async def get_words_to_review(
             UserWordProgress.next_review_at <= now
         )
         .order_by(UserWordProgress.next_review_at)
+    )
+    result = await db.execute(stmt)
+    return result.scalars().all()
+
+@app.get("/books/", response_model=List[schemas.BookOut])
+async def get_books(
+    db: AsyncSession = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    stmt = select(models.Book)
+    result = await db.execute(stmt)
+    return result.scalars().all()
+
+@app.get("/books/{book_id}/words", response_model=List[schemas.WordOut])
+async def get_book_words(
+    book_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    stmt = (
+        select(models.Word)
+        .where(models.Word.book_id == book_id)
+        .order_by(models.Word.id)
     )
     result = await db.execute(stmt)
     return result.scalars().all()

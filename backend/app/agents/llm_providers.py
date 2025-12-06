@@ -23,10 +23,17 @@ class DeepSeekChatModel(BaseChatModel):
     model_name: str = "deepseek-chat"
     temperature: float = 0.7
     max_tokens: Optional[int] = None
-    
+
     @property
     def _llm_type(self) -> str:
         return "deepseek"
+
+    def bind_tools(self, tools, **kwargs) -> "DeepSeekChatModel":
+        """
+        绑定工具到模型
+        """
+        # 暂时返回自身，工具调用将在工具层面处理
+        return self
     
     def _generate(
         self,
@@ -133,10 +140,17 @@ class GLM4ChatModel(BaseChatModel):
     model_name: str = "glm-4"
     temperature: float = 0.7
     max_tokens: Optional[int] = None
-    
+
     @property
     def _llm_type(self) -> str:
         return "glm4"
+
+    def bind_tools(self, tools, **kwargs) -> "GLM4ChatModel":
+        """
+        绑定工具到模型
+        """
+        # 暂时返回自身，工具调用将在工具层面处理
+        return self
     
     def _generate(
         self,

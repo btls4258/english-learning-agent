@@ -1,48 +1,87 @@
-#/home/btls/english-learning-agent/.gitignore
+# English Learning Agent - Git Ignore File
+# ================================================
+
 # ==========================
 # Python (后端)
 # ==========================
-# 字节码文件 (Python 自动生成的)
+# Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 *$py.class
 
-# C 扩展
+# C extensions
 *.so
 
-# 包发布相关
-dist/
+# Distribution / packaging
+.Python
 build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
 *.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
 
-# PyInstaller (如果以后打包)
+# PyInstaller
 *.manifest
 *.spec
 
-# ==========================
-# 虚拟环境 (Virtual Env)
-# ==========================
-# 这一条非常重要，不要上传几百兆的依赖包
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+
+# Virtual environments
+# IMPORTANT: Never upload hundreds of MB of dependencies!
 venv/
 .venv/
 env/
 ENV/
+env.bak/
+venv.bak/
 
 # ==========================
-# 环境变量与安全 (CRITICAL)
+# Environment & Security (CRITICAL)
 # ==========================
-# 绝对不能上传包含密码的文件！！！
+# NEVER upload files containing secrets!
 .env
 .env.*
 *.env
+api_keys.txt
+secrets.json
 
-# 但是可以保留一个示例文件 (如果没有，建议以后创建一个 .env.example)
+# Keep example files
 !.env.example
+!secrets.example.json
 
 # ==========================
-# IDE / 编辑器
+# IDE & Editor Files
 # ==========================
-# VS Code 设置 (根据个人喜好，通常不上传本地配置)
+# VSCode
 .vscode/
 !.vscode/settings.json
 !.vscode/tasks.json
@@ -51,35 +90,101 @@ ENV/
 
 # JetBrains / PyCharm
 .idea/
+*.iml
+*.ipr
+*.iws
 
-# Mac / Windows 系统文件
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# ==========================
+# System Files
+# ==========================
+# macOS
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
 
+# Windows
+*.lnk
+desktop.ini
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
 # ==========================
-# 数据库
+# Database
 # ==========================
-# 虽然你用的是 Postgres，但防止以后生成本地临时库
+# SQLite databases (preventing accidental upload)
 *.sqlite3
+*.sqlite
 *.db
 
-# ==========================
-# 日志文件
-# ==========================
-*.log
-logs/
+# Database backups
+*.sql.bak
+*.dump
 
 # ==========================
-# Flutter (前端 - 预留)
+# Logs & Runtime
 # ==========================
+# Log files
+*.log
+logs/
+*.log.*
+debug.log
+error.log
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# ==========================
+# Flutter (前端)
+# ==========================
+# Dart/Flutter tooling
 .dart_tool/
 .packages
 .pub/
 .flutter-plugins
 .flutter-plugins-dependencies
+.pub-cache/
 
 # Flutter build output
 /build/
+**/build/
 
 # Android specific
 **/android/app/libs/
@@ -89,9 +194,85 @@ logs/
 **/android/captures/
 **/android/gradle.properties
 **/android/local.properties
+**/android/key.properties
+**/android/keystore.properties
 
 # iOS specific
 **/ios/Flutter/App.framework
 **/ios/Flutter/Flutter.framework
 **/ios/ServiceDefinitions.json
 **/ios/Runner/GeneratedPluginRegistrant.**:Zone.Identifier
+**/ios/Runner.xcworkspace/xcuserdata/
+**/ios/Runner.xcodeproj/xcuserdata/
+**/ios/Flutter/Flutter.xcworkspace/xcuserdata/
+**/ios/Flutter/Flutter.xcodeproj/xcuserdata/
+**/ios/.symlinks/
+
+# Web specific
+**/web/flutter.js
+**/web/flutter_service_worker.js
+
+# ==========================
+# Testing & Quality
+# ==========================
+# Test coverage and reports
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.pytest_cache/
+test-reports/
+coverage-reports/
+
+# Benchmark results
+benchmark-results/
+performance-tests/
+
+# ==========================
+# Documentation Generated
+# ==========================
+# Sphinx documentation
+docs/_build/
+
+# ==========================
+# Machine Learning & AI
+# ==========================
+# Model files (can be very large)
+*.pkl
+*.pickle
+*.model
+*.h5
+*.hdf5
+*.pb
+*.onnx
+
+# Training data
+data/raw/
+data/processed/
+datasets/
+training-data/
+
+# Cache
+.cache/
+model_cache/
+transformers_cache/
+
+# ==========================
+# Project Specific
+# ==========================
+# User uploaded content
+uploads/
+user_data/
+content/
+
+# Backup files
+*.bak
+*.backup
+*.old
+
+# WSL2 specific
+.wslconfig
+
+# Development scripts that create temporary files
+temp/
+tmp/
