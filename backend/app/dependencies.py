@@ -12,8 +12,8 @@ from app.database import get_db
 from app import models
 from app.security import SECRET_KEY, ALGORITHM
 
-# OAuth2 密码流
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+# OAuth2 密码流 - 注意这里需要指向正确的token URL
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
 
 async def get_current_user(

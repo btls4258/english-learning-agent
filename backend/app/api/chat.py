@@ -199,14 +199,23 @@ async def get_available_tools():
     """
     from app.agents.tools import learning_tools
 
+    # 手动定义工具列表，避免依赖__all__
+    tool_names = [
+        "search_dictionary",
+        "create_vocabulary_exercise",
+        "get_grammar_explanation",
+        "get_user_progress"
+    ]
+
     tools_info = []
-    for tool_func in learning_tools.__all__:
-        tool_obj = getattr(learning_tools, tool_func)
-        if hasattr(tool_obj, 'name') and hasattr(tool_obj, 'description'):
-            tools_info.append({
-                "name": tool_obj.name,
-                "description": tool_obj.description,
-                "function": tool_func
-            })
+    for tool_func in tool_names:
+        if hasattr(learning_tools, tool_func):
+            tool_obj = getattr(learning_tools, tool_func)
+            if hasattr(tool_obj, 'name') and hasattr(tool_obj, 'description'):
+                tools_info.append({
+                    "name": tool_obj.name,
+                    "description": tool_obj.description,
+                    "function": tool_func
+                })
 
     return tools_info

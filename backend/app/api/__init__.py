@@ -1,2 +1,7 @@
 # backend/app/api/__init__.py
-# 空文件即可
+"""
+API包初始化文件
+"""
+from .main import router
+
+__all__ = ["router"]
